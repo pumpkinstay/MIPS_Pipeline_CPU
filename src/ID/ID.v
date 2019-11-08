@@ -1,0 +1,127 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company:  ZJU
+// Engineer:  JiangNan WU  20181217
+// Create Date:    17/12/2018 
+// Description:   ID stage of pipeline CPU 
+//
+//////////////////////////////////////////////////////////////////////////////////
+module ID(clk,Instruction_id, NextPC_id, RegWrite_wb, RegWriteAddr_wb, RegWriteData_wb, MemRead_ex, 
+          RegWriteAddr_ex, MemtoReg_id, RegWrite_id, MemWrite_id, MemRead_id, ALUCode_id, 
+	  ALUSrcA_id, ALUSrcB_id, RegDst_id, Stall, Z, J, JR, PC_IFWrite,  BranchAddr, JumpAddr,
+	  JrAddr,Imm_id, Sa_id, RdAddr_id, RsAddr_id, RtAddr_id, RsData_id, RtData_id);
+		input clk;
+		input [31:0] Instruction_id;
+    	input [31:0] NextPC_id;
+    	input RegWrite_wb;
+    	input [4:0] RegWriteAddr_wb;
+    	input [31:0] RegWriteData_wb;
+    	input MemRead_ex;
+    	input [4:0] RegWriteAddr_ex;
+    	output MemtoReg_id;
+    	output RegWrite_id;
+    	output MemWrite_id;
+    	output MemRead_id;
+    	output [4:0] ALUCode_id;
+    	output ALUSrcA_id;
+    	output ALUSrcB_id;
+    	output RegDst_id;
+    	output Stall;
+    	output Z;
+    	output J;
+    	output JR;
+    	output PC_IFWrite;
+    	output [31:0] BranchAddr;
+    	output [31:0] JumpAddr;
+		output [31:0] JrAddr;
+    	output [31:0] Imm_id;
+    	output [31:0] Sa_id;
+    	output [4:0] RdAddr_id;
+    	output [4:0] RsAddr_id;
+    	output [4:0] RtAddr_id;
+    	output [31:0] RsData_id;
+    	output [31:0] RtData_id;
+
+
+//******************************************************************************
+//Decode, output : control signals
+//******************************************************************************
+	Decode Decode(   
+		// Outputs
+		.MemtoReg(MemtoReg_id),
+		.RegWrite(RegWrite_id),
+		.MemWrite(MemWrite_id),
+		.MemRead(MemRead_id),
+		.ALUCode(ALUCode_id),
+		.ALUSrcA(ALUSrcA_id),
+		.ALUSrcB(ALUSrcB_id),
+		.RegDst(RegDst_id),
+		.J(J),
+		.JR(JR),
+		// Inputs
+		.Instruction(Instruction_id) );
+	
+	assign RdAddr_id = Instruction_id[15:11];
+	assign RtAddr_id = Instruction_id[20:16];
+	assign RsAddr_id = Instruction_id[25:21];
+		
+//******************************************************************************
+// Branch Test , output : Z ( zero)
+//******************************************************************************
+	BranchTest   BranchTest (
+		.ALUCode_id(ALUCode_id),
+		.RsData_id(RsData_id),
+		.RtData_id(RtData_id),
+		
+		// Outputs
+		.Z (Z)  );
+
+//******************************************************************************
+// Register files  with Read After Write  function
+//******************************************************************************
+		
+		RegFiles  RegFiles( 	
+		// Inputs
+		.clk(clk), 
+		.RegWriteData_wb(RegWriteData_wb), 
+		.RegWriteAddr_wb(RegWriteAddr_wb), 
+		.RegWrite_wb(RegWrite_wb), 
+		.RsAddr_id(RsAddr_id), 
+		.RtAddr_id(RtAddr_id),
+		
+		// Outputs
+		.RsData_id(RsData_id), 
+		.RtData_id(RtData_id));
+
+				
+//******************************************************************************
+// Hazard Detector 
+//******************************************************************************
+
+		 HazardDetector HazardDetector( 
+				// Inputs
+				.MemRead_ex(MemRead_ex), 
+				.RegWriteAddr_ex(RegWriteAddr_ex), 
+				.RsAddr_id(RsAddr_id), 
+				.RtAddr_id(RtAddr_id),
+				
+				// Outputs
+				.stall(Stall),
+				.PC_IFWrite (PC_IFWrite) );
+				
+//   **  J Adder  **// 
+		assign JumpAddr = {NextPC_id[31:28] , Instruction_id[25:0] , 2'b00}; 
+		
+//    **  BranchAddr   **// 
+	assign Imm_id = {{(16){Instruction_id[15]}},Instruction_id[15:0]};// Sign extend
+			
+	assign BranchAddr = NextPC_id + (Imm_id<<2 );
+
+
+//   **  JrAddr   **// 
+	assign JrAddr = RsData_id;
+	
+//   **   Zero extend (shamt_id )  **// 
+	assign Sa_id = {27'b0 , Instruction_id[10:6] };
+	
+endmodule		
